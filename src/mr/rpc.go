@@ -14,16 +14,48 @@ import "strconv"
 // and reply for an RPC.
 //
 
-type ExampleArgs struct {
-	X int
-}
-
-type ExampleReply struct {
-	Y int
-}
+//type ExampleArgs struct {
+//	X int
+//}
+//
+//type ExampleReply struct {
+//	Y int
+//}
 
 // Add your RPC definitions here.
+type RequestTaskArgs struct {
+}
 
+type RequestTaskReply struct {
+	Assign bool
+	Task   Task
+}
+
+//type RequestStateArgs struct {
+//}
+//
+//type RequestStateReply struct {
+//	NReduce int
+//	mapDone bool
+//	done    bool
+//}
+
+type RegisterArgs struct {
+}
+
+type RegisterReply struct {
+	Id      int
+	NReduce int
+	NFiles  int
+}
+
+type TaskDoneArgs struct {
+	TaskType TaskType
+	TaskId   int
+}
+
+type TaskDoneReply struct {
+}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.
