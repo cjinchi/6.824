@@ -31,3 +31,11 @@ type GetReply struct {
 	Err   Err
 	Value string
 }
+
+type ApplyState int
+
+const (
+	WaitForApply = iota
+	Applied      = iota
+	Expired      = iota
+)
