@@ -20,6 +20,7 @@ package raft
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"math/rand"
 
 	//	"bytes"
@@ -109,9 +110,11 @@ type LogEntry struct {
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
 	// Your code here (2A).
-	rf.mu.Lock()
+	//rf.mu.Lock()
+	rf.lock("GetState")
 	//fmt.Printf("%v get lock in GetState\n", rf.me)
-	defer rf.mu.Unlock()
+	//defer rf.mu.Unlock()
+	defer rf.unlock("GetState")
 	return rf.currentTerm, rf.roleState == Leader
 }
 
@@ -270,9 +273,11 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 // RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	rf.mu.Lock()
+	//rf.mu.Lock()
+	rf.lock("RequestVote")
 	//fmt.Printf("%v get lock in RequestVote\n", rf.me)
-	defer rf.mu.Unlock()
+	//defer rf.mu.Unlock()
+	defer rf.unlock("RequestVote")
 	changed := false
 	if args.Term > rf.currentTerm {
 		rf.currentTerm = args.Term
@@ -310,8 +315,9 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 //
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	//fmt.Printf("term:%v; %v receives AE from %v before lock\n", rf.currentTerm, rf.me, args.LeaderId)
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
+	//rf.mu.Lock()
+	rf.lock("AppendEntries")
+	defer rf.unlock("AppendEntries")
 	//fmt.Printf("term:%v; %v receives AE from %v\n", rf.currentTerm, rf.me, args.LeaderId)
 	shouldTimerReset := false
 	shouldPersist := false
@@ -396,9 +402,11 @@ func (rf *Raft) resetTimer() {
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 
 	// Your code here (2B).
-	rf.mu.Lock()
+	//rf.mu.Lock()
+	rf.lock("Start")
 	//fmt.Printf("%v get lock in Start\n", rf.me)
-	defer rf.mu.Unlock()
+	//defer rf.mu.Unlock()
+	defer rf.unlock("Start")
 
 	index := -1
 	term := -1
@@ -413,6 +421,8 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		index = len(rf.log)
 		rf.persist()
 		term = rf.currentTerm
+		//fmt.Println("send to all")
+		//rf.sendAppendEntriesToAll()
 	}
 
 	return index, term, isLeader
@@ -448,12 +458,14 @@ func (rf *Raft) ticker() {
 		// time.Sleep().
 		select {
 		case <-rf.timer.C:
-			rf.mu.Lock()
+			//rf.mu.Lock()
+			rf.lock("ticker")
 			//fmt.Printf("%v get lock in ticker\n", rf.me)
 			if !rf.killed() && rf.roleState != Leader {
 				rf.changeRoleState(Candidate)
 			}
-			rf.mu.Unlock()
+			//rf.mu.Unlock()
+			rf.unlock("ticker")
 		}
 
 	}
@@ -485,13 +497,16 @@ func (rf *Raft) changeRoleState(newRoleState int) {
 
 		go func() {
 			for {
-				rf.mu.Lock()
+				//rf.mu.Lock()
+				rf.lock("changeRoleState")
 				//fmt.Printf("%v get lock in changeRoleState\n", rf.me)
 				if !rf.killed() && rf.roleState == Leader {
 					rf.sendAppendEntriesToAll()
-					rf.mu.Unlock()
+					//rf.mu.Unlock()
+					rf.unlock("changeRoleState 1")
 				} else {
-					rf.mu.Unlock()
+					//rf.mu.Unlock()
+					rf.unlock("changeRoleState 2")
 					break
 				}
 
@@ -524,7 +539,8 @@ func (rf *Raft) sendRequestVoteToAll() {
 			var reply = RequestVoteReply{}
 			result := rf.sendRequestVote(target, &args, &reply)
 			if result {
-				rf.mu.Lock()
+				//rf.mu.Lock()
+				rf.lock("sendRequestVoteToAll")
 				//fmt.Printf("%v get lock in sendRequestVoteToAll\n", rf.me)
 				shouldPersist := false
 				if rf.currentTerm == args.Term && reply.VoteGranted {
@@ -544,7 +560,8 @@ func (rf *Raft) sendRequestVoteToAll() {
 				if shouldPersist {
 					rf.persist()
 				}
-				rf.mu.Unlock()
+				//rf.mu.Unlock()
+				rf.unlock("sendRequestVoteToAll")
 			}
 		}()
 
@@ -581,7 +598,8 @@ func (rf *Raft) sendAppendEntriesToAll() {
 				return
 			}
 
-			rf.mu.Lock()
+			//rf.mu.Lock()
+			rf.lock("sendAppendEntriesToAll")
 			//fmt.Printf("%v get lock in sendAppendEntriesToAll\n", rf.me)
 			shouldPersist := false
 			shouldResetTimer := false
@@ -619,7 +637,7 @@ func (rf *Raft) sendAppendEntriesToAll() {
 			if shouldPersist {
 				rf.persist()
 			}
-			rf.mu.Unlock()
+			rf.unlock("sendAppendEntriesToAll")
 
 		}()
 
@@ -665,6 +683,17 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	go rf.ticker()
 
 	return rf
+}
+
+func (rf *Raft) lock(msg string) {
+	fmt.Printf("%v wait for lock: %v\n", rf.me, msg)
+	rf.mu.Lock()
+	fmt.Printf("%v acquire lock: %v\n", rf.me, msg)
+}
+
+func (rf *Raft) unlock(msg string) {
+	fmt.Printf("%v unlock: %v\n", rf.me, msg)
+	rf.mu.Unlock()
 }
 
 func min(a int, b int) int {
